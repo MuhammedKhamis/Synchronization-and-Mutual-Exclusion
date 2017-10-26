@@ -15,14 +15,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "caltrain.h"
+#include "caltrain.c"
 
 // Count of passenger threads that have completed (i.e. station_wait_for_train
 // has returned) and are awaiting a station_on_board() invocation.
 volatile int threads_completed = 0;
 
-void*
-passenger_thread(void *arg)
+void* passenger_thread(void *arg)
 {
 	struct station *station = (struct station*)arg;
 	station_wait_for_train(station);//assume threads sleep here
@@ -37,8 +36,7 @@ struct load_train_args {
 
 volatile int load_train_returned = 0;
 
-void*
-load_train_thread(void *args)
+void* load_train_thread(void *args)
 {
 	struct load_train_args *ltargs = (struct load_train_args*)args;
 	station_load_train(ltargs->station, ltargs->free_seats);
@@ -49,16 +47,14 @@ load_train_thread(void *args)
 const char* alarm_error_str;
 int alarm_timeout;
 
-void
-_alarm(int seconds, const char *error_str)
+void _alarm(int seconds, const char *error_str)
 {
 	alarm_timeout = seconds;
 	alarm_error_str = error_str;
 	alarm(seconds);
 }
 
-void
-alarm_handler(int foo)
+void alarm_handler(int foo)
 {
 	fprintf(stderr, "Error: Failed to complete after %d seconds. Something's "
 		"wrong, or your system is terribly slow. Possible error hint: [%s]\n",
@@ -73,8 +69,7 @@ alarm_handler(int foo)
 /*
  * This creates a bunch of threads to simulate arriving trains and passengers.
  */
-int
-main()
+int main()
 {
 	struct station station;
 	station_init(&station);
