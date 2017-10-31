@@ -8,6 +8,7 @@ struct station {
   pthread_cond_t trainInStation;
   pthread_cond_t inTheTrain;
   pthread_cond_t trainFull;
+  int emptySeates;
   int passengersToEnter;
   int passengersOut;
 };

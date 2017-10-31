@@ -17,10 +17,12 @@ void station_init(struct station *station){
   pthread_cond_init(&(station->inTheTrain), NULL);
   // condtion that train is full and ready to go.
   pthread_cond_init(&(station->trainFull), NULL);
-  // number of passengers that will go from outside to the inside of the train.
+  // number of passengers that will go from outside to train.
   station->passengersToEnter=0;
   // number of passengers waiting outside for the train.
   station->passengersOut=0;
+  // number of empty seats inside the train.
+  station->emptySeates=0;
  }
 
 /** Invokes when train arrives,
@@ -33,11 +35,9 @@ void station_load_train(struct station *station, int count){
 
     pthread_mutex_lock(&(station->lock));
 //////////////////////////////////Critical Section//////////////////////////////
-    while(station->passengersOut > 0 && count > 0){
-      // signal for each thread at a time.
-        pthread_cond_signal(&(station->trainInStation));
-        // decrese number of seats by 1.
-        count--;
+    station->emptySeates = count;
+    pthread_cond_broadcast(&(station->trainInStation));
+    while(station->passengersOut > 0 && station->emptySeates > 0){
         // wait until passenger set in the train.
         pthread_cond_wait(&(station->inTheTrain),&(station->lock));
     }
@@ -45,6 +45,7 @@ void station_load_train(struct station *station, int count){
       if(station->passengersToEnter > 0){
         pthread_cond_wait(&(station->trainFull), &(station->lock));
       }
+      station->emptySeates=0;
     ////////////////////////////////////////////////////////////////////////////////
     pthread_mutex_unlock(&(station->lock));
 
@@ -64,8 +65,10 @@ void station_wait_for_train(struct station *station){
   // increase number of passengers outside by one.
   station->passengersOut++;
   // wait until the train arrives.
-  pthread_cond_wait(&(station->trainInStation),&(station->lock));
-  //the train has come :D
+  while(station->emptySeates == 0){
+    //the train has come :D
+    pthread_cond_wait(&(station->trainInStation),&(station->lock));
+  }
 
   // number of passengers that entered from outside to the inside increased by one.
   station->passengersToEnter++;
@@ -73,8 +76,11 @@ void station_wait_for_train(struct station *station){
   // enumber of passengers out decreased by one.
   station->passengersOut--;
 
-  // tell the train we are ready and set for the next passenger.
-  pthread_cond_broadcast(&(station->inTheTrain));
+  // number of empty seats are decreased by one.
+  station->emptySeates--;
+
+  // signal train that I have done and on the train.
+  pthread_cond_signal(&(station->inTheTrain));
   //////////////////////////////////////////////////////////////////////////////
   pthread_mutex_unlock(&(station->lock));
 
@@ -89,12 +95,11 @@ void station_on_board(struct station *station){
   /////////////////////////Critical Section/////////////////////////////////////
   // number of passengers entered decreased by one.
   station->passengersToEnter--;
-
+  //////////////////////////////////////////////////////////////////////////////
+  pthread_mutex_unlock(&(station->lock));
   // checked all are set in place
   if(!(station->passengersToEnter)){
     // tell the train to leave the station.
-    pthread_cond_broadcast(&(station->trainFull));
+    pthread_cond_signal(&(station->trainFull));
   }
-  //////////////////////////////////////////////////////////////////////////////
-  pthread_mutex_unlock(&(station->lock));
 }
