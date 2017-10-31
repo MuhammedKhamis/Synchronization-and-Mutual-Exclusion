@@ -9,17 +9,17 @@ void debug(const char* word){
 
 
 void station_init(struct station *station){
-  // dah el lock bta3i ma7desh y2dar yeshta8al me 8ero
+  // Lock, no one can work without it.
   pthread_mutex_init(&(station->lock), NULL);
-  // el train wasal el m7ata
+  // condition train arriving the station.
   pthread_cond_init(&(station->trainInStation), NULL);
-  // el passenger rakab el train 5las
+  // condtion for passenger in the train.
   pthread_cond_init(&(station->inTheTrain), NULL);
-  // el train 5las 5las we gahez ino yeseb el m7ata
+  // condtion that train is full and ready to go.
   pthread_cond_init(&(station->trainFull), NULL);
-  // 3ddad el nas el 7aterkab me bara le gowa el train
+  // number of passengers that will go from outside to the inside of the train.
   station->passengersToEnter=0;
-  // 3ddad el nas ely mestanya bara
+  // number of passengers waiting outside for the train.
   station->passengersOut=0;
  }
 
@@ -33,19 +33,15 @@ void station_load_train(struct station *station, int count){
 
     pthread_mutex_lock(&(station->lock));
 //////////////////////////////////Critical Section//////////////////////////////
-    // pthread_cond_broadcast(&(station->trainInStation));
-    // bug Here if broadcast : 3shan low inta sa7ethom kolohm mmomken yego wara b3d we mayb2ash
-    // lltrain forsa inoh yege fe elnos mmken yegi fe el 25er we tkon 25dt 2ktar men ele inta 3ayzoh we ydrab
-    // fa enta lazem tsa7y wa7d wa7d wara b3d mesh m3 ba3d
     while(station->passengersOut > 0 && count > 0){
-      // Hena basa7y wa7d at a time.
+      // signal for each thread at a time.
         pthread_cond_signal(&(station->trainInStation));
-        //decrese 3dd el krasy el gowa by 1
+        // decrese number of seats by 1.
         count--;
-      // estana l7ad ma el passenger yed5ol we y23od b3d keda kamel
+        // wait until passenger set in the train.
         pthread_cond_wait(&(station->inTheTrain),&(station->lock));
     }
-      // wait until they tell us to leave n3ed kol el nas 2bl ma nemshy
+      // wait until they tell us to leave.
       if(station->passengersToEnter > 0){
         pthread_cond_wait(&(station->trainFull), &(station->lock));
       }
@@ -65,24 +61,22 @@ void station_wait_for_train(struct station *station){
 
   pthread_mutex_lock(&(station->lock));
   /////////////////////////Critical Section/////////////////////////////////////
-  // bashof kam wa7d 3ayez el train
+  // increase number of passengers outside by one.
   station->passengersOut++;
-  // b2olo estana l7ad ma el train yege
+  // wait until the train arrives.
   pthread_cond_wait(&(station->trainInStation),&(station->lock));
-  //el train gah Heeeee :party: :D
+  //the train has come :D
 
-  // el passenger 7ayerkab el train we el passengers ely da5lo me bara
-  // le gowa 7ayzedo be wa7ed
+  // number of passengers that entered from outside to the inside increased by one.
   station->passengersToEnter++;
-  // el passengers el bara 7a2lo wa7ed
+
+  // enumber of passengers out decreased by one.
   station->passengersOut--;
-  // 2ol le el train 2ny 5last we 23adt 3shan ya5od ely ba3di
+
+  // tell the train we are ready and set for the next passenger.
   pthread_cond_broadcast(&(station->inTheTrain));
   //////////////////////////////////////////////////////////////////////////////
   pthread_mutex_unlock(&(station->lock));
-  // Side note : m3rfesh 25er satren law etbadelo eh ely 7aye7sal bas 2zon mafesh
-  //7aga 7at7sal 3shan el mutex lesa m3aya we el train lesa mestany 3leh fa howa
-  // mesh 7ayt7ark men 3'er ma ana 23mel release aka signal.
 
 }
 /**
@@ -93,19 +87,13 @@ void station_on_board(struct station *station){
 
   pthread_mutex_lock(&(station->lock));
   /////////////////////////Critical Section/////////////////////////////////////
-  // Note:
-  // t2reban el function deh bt3mel check in kol wa7ed me el passengers 23ad makano
-  // 3shan el mo3ed beya3mel loop fe el test bay3ed kam thread da5alt gowa el train
-  // 3shan keda feh counter llenas ely 7atd5ol 3shan el loop el bara tt2kd
+  // number of passengers entered decreased by one.
   station->passengersToEnter--;
 
-  // Note :
-  // 23taked mesh 7tefra2 low 3malt el condition dah bara wala gowa 3shan
-  // el passengers wa2fen l2ed el train howa ely beynadi bas el train wa2ef 3shan
-  // by3ed el nas ely 3ndo gowa 2bl ma yemshy
+  // checked all are set in place
   if(!(station->passengersToEnter)){
-    // 5lash 2otobes complete :'''D
-    pthread_cond_signal(&(station->trainFull));
+    // tell the train to leave the station.
+    pthread_cond_broadcast(&(station->trainFull));
   }
   //////////////////////////////////////////////////////////////////////////////
   pthread_mutex_unlock(&(station->lock));
